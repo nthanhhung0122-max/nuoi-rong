@@ -16,11 +16,14 @@
           + Tu dong mo khoa o Dau truong moi khi du Vang
           + Tu dong xep Rong chien dau manh nhat vao o trong
           + Tu dong mua & ap Trung Dong (14.000 Vang) khi con o trong ma het Rong
-      - TU DONG CAY SMART LINKS & ADS FULL 4 NGUON (Toi da 480.000 Vang/ngay):
+      - TU DONG CAY TAB SMARTLINK (UU DAI DOI TAC MONETAG, HILLTOPADS):
+          + 15 luot / ngay, moi luot +1.000 Vang, cooldown 10 phut
+          + Tu dong mo va nhan thuong Smartlink ngay khi het cooldown!
+      - TU DONG CAY TAB QUANG CAO (ADS FULL 4 NGUON - Toi da 480.000 Vang/ngay):
           + Ads Task (30 lan x 10.000 = 300.000 Vang)
-          + Monetag Popup Smart Link (20 lan x 3.000 = 60.000 Vang)
-          + Monetag Interstitial Smart Link (20 lan x 3.000 = 60.000 Vang)
-          + Adsgram Rewarded Video (20 lan x 3.000 = 60.000 Vang)
+          + Monetag Popup (20 lan x 3.000 = 60.000 Vang, cooldown 15m)
+          + Monetag Interstitial (20 lan x 3.000 = 60.000 Vang, cooldown 15m)
+          + Adsgram Rewarded Video (20 lan x 3.000 = 60.000 Vang, cooldown 15m)
       - TU DONG NANG CAP & GHEP RONG (Fusion) khi co the giong nhau
       - TU DONG NHAN TOAN BO NHIEM VU HANG NGAY (Quests)
       - HO TRO CHAY 24/7 TREN GITHUB ACTIONS HOAC MAY CA NHAN
@@ -51,7 +54,6 @@ API_ID = 39182276
 API_HASH = "f02b155d895a3a3fbf8a1cbe810b5338"
 
 # StringSession Telethon cho Hùng Zai (@hungzai22 - ID: 7744031191)
-# 100% chay tren RAM, khong tao file SQLite -> Khong bao gio loi disk malformed
 DEFAULT_STRING_SESSION = (
     "1BVtsOHIBuxmpWiBJ9hvwV9pSrzWw5U2I5Fe20Ww8l1LCk9rnsG6T6lLZEJXZE1JJC_qUH_yyWHnRoed"
     "RNI5lJYnfjRN4gyGeDrCxquDU12ZflrpCz0VLhMZx2C0LlyUCy2eHRSRE1wUCpEYZaymL0P7Z9eAHwMy4"
@@ -208,9 +210,70 @@ def handle_quests():
         log("ERR", f"Loi kiem tra nhiem vu: {e}", Fore.RED)
 
 # -----------------------------------------------------------------
-#  SMART LINKS & QUANG CAO (FULL 4 NGUON)
+#  TAB SMARTLINK (UU DAI DOI TAC - 15 LUOT / NGAY, 10 PHUT/LAN)
 # -----------------------------------------------------------------
-def handle_smartlinks_and_ads():
+def handle_partner_smartlinks():
+    t_id = USER_INFO["telegramId"]
+    u_name = USER_INFO["username"]
+
+    try:
+        r_stat = http_session.get(
+            f"{BASE_URL}/api/smartlinks/status?telegramId={t_id}&initData={urllib.parse.quote(CURRENT_INIT_DATA)}",
+            headers=get_headers(),
+            timeout=15
+        )
+        if r_stat.status_code != 200:
+            return 600
+
+        st = r_stat.json()
+        rem = st.get("remainingToday", 0)
+        daily_limit = st.get("dailyLimit", 15)
+        taps_today = st.get("tapsToday", 0)
+        cd_sec = st.get("cooldownRemainingSec", 0)
+        links = st.get("links", [])
+
+        if rem <= 0:
+            log("SMARTLINK", f"Tab Smartlink: Da hoan thanh {taps_today}/{daily_limit} luot hom nay!", Fore.WHITE)
+            return 600
+
+        if cd_sec > 0:
+            mins, secs = divmod(cd_sec, 60)
+            log("SMARTLINK", f"Tab Smartlink: Con {rem}/{daily_limit} luot (dang cho cooldown {mins}p {secs}s)", Fore.YELLOW)
+            return cd_sec
+
+        # Kich hoat tap Smartlink
+        if links:
+            chosen = random.choice(links)
+            link_id = chosen.get("id")
+            net_name = chosen.get("network", "Doi tac")
+
+            log("SMARTLINK", f"Dang mo Smartlink [{net_name}] (Link ID: {link_id})...", Fore.CYAN)
+            tap_r = http_session.post(f"{BASE_URL}/api/smartlinks/tap", json={
+                "telegramId": t_id,
+                "username": u_name,
+                "initData": CURRENT_INIT_DATA,
+                "linkId": link_id
+            }, headers=get_headers(), timeout=15)
+
+            if tap_r.status_code == 200:
+                res_data = tap_r.json()
+                reward = res_data.get("rewardGold", 1000)
+                taps = res_data.get("tapsToday", taps_today + 1)
+                rem_after = res_data.get("remainingToday", rem - 1)
+                cd = res_data.get("cooldownRemainingSec", 600)
+                log("SMARTLINK", f"🎉 Nhan thanh cong Smartlink [{net_name}]: +{fmt_num(reward)} Vang! (Hom nay: {taps}/{daily_limit} luot, con {rem_after} luot)", Fore.GREEN)
+                return cd
+            else:
+                log("WARN", f"Smartlink tap bao: {tap_r.text}", Fore.YELLOW)
+                return 60
+    except Exception as e:
+        log("ERR", f"Loi tab Smartlink: {e}", Fore.RED)
+        return 600
+
+# -----------------------------------------------------------------
+#  TAB QUANG CAO (ADS FULL 4 NGUON)
+# -----------------------------------------------------------------
+def handle_ads_tab():
     t_id = USER_INFO["telegramId"]
     u_name = USER_INFO["username"]
     next_cooldowns = []
@@ -226,7 +289,7 @@ def handle_smartlinks_and_ads():
             task_status = r_task.json()
             rem = task_status.get("remaining", 0)
             if rem > 0:
-                log("SMARTLINK", f"Phat hien {rem} luot Ads Task (+10.000 Vang/luot), bat dau nhan...", Fore.YELLOW)
+                log("ADS", f"Phat hien {rem} luot Ads Task (+10.000 Vang/luot), bat dau nhan...", Fore.YELLOW)
                 while rem > 0:
                     claim_r = http_session.post(f"{BASE_URL}/api/ads/task/claim", json={
                         "telegramId": t_id,
@@ -236,19 +299,19 @@ def handle_smartlinks_and_ads():
                     if claim_r.status_code == 200:
                         c_data = claim_r.json()
                         rem = c_data.get("remaining", 0)
-                        log("SMARTLINK", f"Nhan Ads Task thanh cong: +{fmt_num(c_data.get('rewardGold', 10000))} Vang! (Con {rem} luot)", Fore.GREEN)
+                        log("ADS", f"Nhan Ads Task thanh cong: +{fmt_num(c_data.get('rewardGold', 10000))} Vang! (Con {rem} luot)", Fore.GREEN)
                         time.sleep(random.uniform(2, 3.5))
                     else:
                         break
             else:
-                log("ADS", "Ads Task: da hoan thanh 30/30 luot trong ngay!", Fore.WHITE)
+                log("ADS", "Ads Task (Thu Thach Rong): da hoan thanh 30/30 luot trong ngay!", Fore.WHITE)
     except Exception as e:
         log("ERR", f"Loi Ads Task: {e}", Fore.RED)
 
-    # 2. Cac kenh Smartlink & Video Rewarded (cooldown 15 phut / lan)
+    # 2. Cac kenh Monetag & Video Rewarded (cooldown 15 phut / lan)
     ad_channels = [
-        ("popup", "/api/ads/monetag/popup/status", "/api/ads/monetag/popup/claim", "Monetag Popup (Smart Link)"),
-        ("interstitial", "/api/ads/monetag/interstitial/status", "/api/ads/monetag/interstitial/claim", "Monetag Interstitial (Smart Link)"),
+        ("popup", "/api/ads/monetag/popup/status", "/api/ads/monetag/popup/claim", "Cong Rong (Monetag Popup)"),
+        ("interstitial", "/api/ads/monetag/interstitial/status", "/api/ads/monetag/interstitial/claim", "Hang Rong (Monetag Video)"),
         ("rewarded", "/api/ads/rewarded/status", "/api/ads/rewarded/claim", "Adsgram Rewarded (Video Ad)")
     ]
 
@@ -265,7 +328,7 @@ def handle_smartlinks_and_ads():
                 cd_sec = st.get("cooldownRemainingSec", 0)
                 if rem > 0:
                     if cd_sec <= 0:
-                        log("SMARTLINK", f"Dang kich hoat {ad_label}...", Fore.CYAN)
+                        log("ADS", f"Dang kich hoat {ad_label}...", Fore.CYAN)
                         claim_r = http_session.post(f"{BASE_URL}{claim_url}", json={
                             "telegramId": t_id,
                             "username": u_name,
@@ -273,7 +336,7 @@ def handle_smartlinks_and_ads():
                         }, headers=get_headers(), timeout=15)
                         if claim_r.status_code == 200:
                             c_data = claim_r.json()
-                            log("SMARTLINK", f"Nhan thuong {ad_label}: +{fmt_num(c_data.get('rewardGold', 3000))} Vang! (Con {c_data.get('remaining', 0)} luot)", Fore.GREEN)
+                            log("ADS", f"Nhan thuong {ad_label}: +{fmt_num(c_data.get('rewardGold', 3000))} Vang! (Con {c_data.get('remaining', 0)} luot)", Fore.GREEN)
                             next_cooldowns.append(900)
                         else:
                             log("WARN", f"{ad_label} thong bao: {claim_r.text}", Fore.YELLOW)
@@ -296,7 +359,6 @@ def handle_arena_and_dragons():
     u_name = USER_INFO["username"]
 
     try:
-        # 1. Lay trang thai Arena (API nay tu dong thu thap Vang da sinh ra)
         r_arena = http_session.get(
             f"{BASE_URL}/api/battle/arena?telegramId={t_id}&initData={urllib.parse.quote(CURRENT_INIT_DATA)}",
             headers=get_headers(),
@@ -317,14 +379,13 @@ def handle_arena_and_dragons():
         now_utc = datetime.now(timezone.utc)
         empty_slot_indices = []
 
-        # 2. Quet cac o de DANH THUC RONG KHI NGU (Wake Up)
+        # Quet cac o de DANH THUC RONG KHI NGU (Wake Up)
         for s in slots:
             s_idx = s.get("slotIndex")
             is_locked = s.get("locked", False)
             placement = s.get("placement")
 
             if is_locked:
-                # Tu dong mo khoa o moi neu du Vang
                 unlock_cost = s.get("unlockCost", 0)
                 if unlock_cost > 0 and curr_gold >= unlock_cost:
                     log("UNLOCK", f"Du Vang ({fmt_num(curr_gold)}/{fmt_num(unlock_cost)} Vang)! Dang mo khoa O Dau Truong {s_idx}...", Fore.CYAN)
@@ -364,7 +425,7 @@ def handle_arena_and_dragons():
                         "slotIndex": s_idx
                     }, headers=get_headers(), timeout=15)
                     if w_r.status_code == 200:
-                        log("WAKE", f"✨ Da danh thuc Rong [{d_name}] thanh cong! Rong da tro lai chien dau va tiep tuc de Vang!", Fore.GREEN)
+                        log("WAKE", f"✨ Da danh thuc Rong [{d_name}] thanh cong! Rong tro lai chien dau va tiep tuc de Vang!", Fore.GREEN)
                     else:
                         log("WARN", f"Chua the danh thuc O {s_idx}: {w_r.text}", Fore.YELLOW)
                 else:
@@ -372,7 +433,7 @@ def handle_arena_and_dragons():
             else:
                 empty_slot_indices.append(s_idx)
 
-        # 3. Neu co o trong, xep Rong manh nhat vao o
+        # Xep Rong manh nhat vao o trong neu co
         if empty_slot_indices:
             r_col = http_session.get(
                 f"{BASE_URL}/api/collection/{t_id}?initData={urllib.parse.quote(CURRENT_INIT_DATA)}",
@@ -412,7 +473,6 @@ def handle_arena_and_dragons():
                         if p_r.status_code == 200:
                             log("ARENA", f"Xep Rong [{d_name}] vao O {slot_idx} thanh cong!", Fore.GREEN)
                     else:
-                        # Neu het Rong ma con Vang (>= 14.000 Vang), tu dong mua va ap Trung Dong
                         if curr_gold >= 14000:
                             log("SHOP", f"Con o trong, dang mua Trung Dong (14.000 Vang) de ap Rong moi...", Fore.YELLOW)
                             open_r = http_session.post(f"{BASE_URL}/api/packs/trung-dong/open", json={
@@ -477,7 +537,7 @@ def run():
         f" Tai khoan : {USER_INFO.get('displayName', 'Hùng Zai')} (@{USER_INFO.get('username', 'hungzai22')} - ID: {USER_INFO.get('telegramId', '7744031191')})",
         f" Bot Game  : @{BOT_USERNAME} | WebApp: {BASE_URL}",
         f" Che do    : Telethon StringSession (RAM 100% - Zero SQLite Error)",
-        f" Tinh nang : Auto Wake Up Dragons | Auto Smartlinks & Ads (480k Vang)",
+        f" Tinh nang : Auto Wake Up Dragons | Auto Smartlink Tab | Auto Ads",
         "=" * 64
     ]
     print("\n" + "\n".join(banner) + "\n", flush=True)
@@ -500,17 +560,20 @@ def run():
             # 2. Tu dong danh thuc Rong & quan ly Dau truong
             handle_arena_and_dragons()
 
-            # 3. Lam Smart Links & Cay Ads full 4 nguon
-            cooldown_min = handle_smartlinks_and_ads()
+            # 3. Tu dong chay Tab Smartlink (Uu dai doi tac Monetag, HilltopAds - 10 phut/lan)
+            cd_smartlink = handle_partner_smartlinks()
 
-            # 4. Quet va Nhan nhiem vu
+            # 4. Tu dong chay Tab Quang cao (Ads Task, Monetag Popup, Interstitial, Rewarded)
+            cd_ads = handle_ads_tab()
+
+            # 5. Quet va Nhan nhiem vu
             handle_quests()
 
-            # 5. Kiem tra ghep Rong
+            # 6. Kiem tra ghep Rong
             if loop_count % 3 == 0:
                 handle_upgrades()
 
-            sleep_duration = max(30, min(cooldown_min, 300))
+            sleep_duration = max(30, min(cd_smartlink, cd_ads, 300))
             mins, secs = divmod(sleep_duration, 60)
             log("WAIT", f"Chu ky {loop_count} hoan tat. Cho {mins}p {secs}s truoc chu ky tiep theo...\n", Fore.WHITE)
             time.sleep(sleep_duration)
