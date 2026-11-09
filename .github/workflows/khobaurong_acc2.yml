@@ -1,0 +1,51 @@
+name: Auto Kho Bau Rong - Acc 2 (gaylobucu)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '18 */5 * * *'
+
+concurrency:
+  group: khobaurong-acc2
+  cancel-in-progress: true
+
+jobs:
+  run-khobaurong-acc2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests telethon colorama
+
+      - name: Chay Auto Kho Bau Rong - Acc 2 (gaylobucu)
+        env:
+          PYTHONUNBUFFERED: "1"
+          PYTHONIOENCODING: "utf-8"
+          WORKFLOW_FILE: "khobaurong_acc2.yml"
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          python auto_khobaurong.py --acc 2
+
+      - name: Tu dong ban giao ca tiep theo (Handover Chaining 24/7)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          echo "Kich hoat ca chay tiep theo cho Acc 2..."
+          sleep 10
+          gh workflow run khobaurong_acc2.yml --repo "${{ github.repository }}" || echo "Handover triggered."
