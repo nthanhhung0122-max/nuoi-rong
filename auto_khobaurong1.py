@@ -273,6 +273,52 @@ def handle_partner_smartlinks():
 # -----------------------------------------------------------------
 #  TAB QUANG CAO (ADS FULL 4 NGUON)
 # -----------------------------------------------------------------
+
+def trigger_rong_adsgram(block_id="34191"):
+    try:
+        parsed = dict(urllib.parse.parse_qsl(CURRENT_INIT_DATA))
+        sig = parsed.get('signature', '')
+        items = [f"{k}={v}" for k, v in parsed.items() if k not in ['hash', 'signature']]
+        items.sort()
+        raw = "\n".join(items)
+        import base64
+        dcs = base64.urlsafe_b64encode(raw.encode('utf-8')).decode('utf-8').rstrip('=')
+
+        ad_headers = {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 14; SM-S928B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.82 Mobile Safari/537.36 Telegram-Android/10.11.1',
+            'Origin': 'https://khobaurong.online',
+            'Referer': 'https://khobaurong.online/',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'org.telegram.messenger'
+        }
+        params = {
+            'blockId': str(block_id),
+            'tg_id': str(USER_INFO.get('telegramId', '')),
+            'tg_platform': 'android',
+            'platform': 'Linux aarch64',
+            'language': 'en',
+            'top_domain': 'khobaurong.online',
+            'signature': sig,
+            'data_check_string': dcs,
+            'sdk_version': '2.2.5'
+        }
+        r = requests.get('https://api.adsgram.ai/adv', headers=ad_headers, params=params, timeout=12)
+        urls = [u.replace('<![CDATA[', '').replace(']]>', '').strip() 
+                for u in re.findall(r'https://api\.adsgram\.ai/[^\s"\'<>]+', r.text) if 'error' not in u]
+        if urls:
+            log("ADSGRAM", f"Dang xem video Adsgram (Block {block_id}) - {len(urls)} tracking events...", Fore.YELLOW)
+            for u in urls[:3]:
+                try: requests.get(u, headers=ad_headers, timeout=6)
+                except Exception: pass
+            time.sleep(9.5)
+            for u in urls[3:]:
+                try: requests.get(u, headers=ad_headers, timeout=6)
+                except Exception: pass
+            return True
+    except Exception as e:
+        log("ADSGRAM_ERR", f"Loi Adsgram: {e}", Fore.LIGHTBLACK_EX)
+    return False
+
 def handle_ads_tab():
     t_id = USER_INFO["telegramId"]
     u_name = USER_INFO["username"]
@@ -329,15 +375,27 @@ def handle_ads_tab():
                 if rem > 0:
                     if cd_sec <= 0:
                         log("ADS", f"Dang kich hoat {ad_label}...", Fore.CYAN)
-                        claim_r = http_session.post(f"{BASE_URL}{claim_url}", json={
-                            "telegramId": t_id,
-                            "username": u_name,
-                            "initData": CURRENT_INIT_DATA
-                        }, headers=get_headers(), timeout=15)
-                        if claim_r.status_code == 200:
+                        if ad_key == "rewarded":
+                            trigger_rong_adsgram("34191")
+
+                        payload = {"telegramId": t_id, "username": u_name, "initData": CURRENT_INIT_DATA}
+                        claim_r = http_session.post(f"{BASE_URL}{claim_url}", json=payload, headers=get_headers(), timeout=15)
+                        
+                        # Neu server dang xac minh (pendingVerification) -> Cho 3s va poll toi da 5 lan nhu frontend
+                        if claim_r.status_code in [200, 202] and "pendingVerification" in claim_r.text:
+                            for p_try in range(1, 6):
+                                time.sleep(3)
+                                claim_r = http_session.post(f"{BASE_URL}{claim_url}", json=payload, headers=get_headers(), timeout=15)
+                                if claim_r.status_code == 200 and not claim_r.json().get("pendingVerification"):
+                                    break
+
+                        if claim_r.status_code == 200 and not claim_r.json().get("pendingVerification"):
                             c_data = claim_r.json()
                             log("ADS", f"Nhan thuong {ad_label}: +{fmt_num(c_data.get('rewardGold', 3000))} Vang! (Con {c_data.get('remaining', 0)} luot)", Fore.GREEN)
                             next_cooldowns.append(900)
+                        elif "pendingVerification" in claim_r.text:
+                            log("ADS", f"{ad_label}: Server dang xac minh, se tu dong cong Vang o ca tiep theo.", Fore.YELLOW)
+                            next_cooldowns.append(60)
                         else:
                             log("WARN", f"{ad_label} thong bao: {claim_r.text}", Fore.YELLOW)
                     else:
