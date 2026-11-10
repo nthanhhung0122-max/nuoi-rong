@@ -1,16 +1,16 @@
-name: Auto Kho Bau Rong - Acc 4 (Wind_trader)
+name: Auto Kho Bau Rong 24/7 (All Accounts)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '24 */5 * * *'
+    - cron: '20 */5 * * *'
 
 concurrency:
-  group: khobaurong-acc4
+  group: khobaurong-all
   cancel-in-progress: true
 
 jobs:
-  run-khobaurong-acc4:
+  run-khobaurong:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     permissions:
@@ -32,20 +32,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests telethon colorama
 
-      - name: Chay Auto Kho Bau Rong - Acc 4 (Wind_trader)
+      - name: Run all accounts (Acc 1 -> Acc 4) in single runner
         env:
           PYTHONUNBUFFERED: "1"
           PYTHONIOENCODING: "utf-8"
-          WORKFLOW_FILE: "khobaurong_acc4.yml"
+          WORKFLOW_FILE: "khobaurong.yml"
           GH_PAT: ${{ secrets.GH_PAT }}
+          MAX_RUNTIME_SECONDS: "19800"
         run: |
-          python auto_khobaurong.py --acc 4
+          python run_all.py
 
       - name: Tu dong ban giao ca tiep theo (Handover Chaining 24/7)
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "Kich hoat ca chay tiep theo cho Acc 4..."
+          echo "Kich hoat ca chay tiep theo..."
           sleep 10
-          gh workflow run khobaurong_acc4.yml --repo "${{ github.repository }}" || echo "Handover triggered."
+          gh workflow run khobaurong.yml --repo "${{ github.repository }}" || echo "Handover triggered."
