@@ -12,6 +12,7 @@ SUPERVISOR 24/7 - QUẢN LÝ ĐA TÀI KHOẢN TRÊN 1 RUNNER GITHUB ACTIONS DUY 
 import sys
 import os
 import time
+import json
 import subprocess
 import threading
 import requests
@@ -34,6 +35,22 @@ IS_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 MAX_RUNTIME = int(os.getenv("MAX_RUNTIME_SECONDS", "19800" if IS_GITHUB_ACTIONS else "0"))  # 5.5h = 19800s
 
 stop_flag = False
+
+def account_env(acc_id):
+    """Bơm session/api_hash từ secret TELEGRAM_ACCOUNTS_JSON xuống tiến trình con."""
+    raw = os.getenv("TELEGRAM_ACCOUNTS_JSON")
+    if not raw:
+        return {}
+    try:
+        accounts = json.loads(raw)["accounts"]
+        acc = accounts[acc_id - 1]
+    except (ValueError, KeyError, IndexError):
+        log("SUPERVISOR", f"TELEGRAM_ACCOUNTS_JSON không đọc được hoặc thiếu Acc {acc_id}.")
+        return {}
+    return {
+        f"TELEGRAM_STRING_SESSION_ACC{acc_id}": acc.get("session_str") or "",
+        f"TELEGRAM_API_HASH_ACC{acc_id}": acc.get("api_hash") or "",
+    }
 
 def log(tag, msg):
     t = datetime.now().strftime("%H:%M:%S")
@@ -78,6 +95,7 @@ def run_account_worker(acc_id, procs_dict):
             child_env["ACC_NUM"] = str(acc_id)
             child_env["PYTHONUNBUFFERED"] = "1"
             child_env["PYTHONIOENCODING"] = "utf-8"
+            child_env.update(account_env(acc_id))
 
             p = subprocess.Popen(
                 cmd,

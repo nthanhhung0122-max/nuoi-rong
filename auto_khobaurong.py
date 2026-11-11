@@ -57,54 +57,10 @@ init(autoreset=True)
 #  DANH SACH TAI KHOAN HO TRO
 # -----------------------------------------------------------------
 ACCOUNTS_CONFIG = {
-    1: {
-        "name": "Acc 1 (hungzai22)",
-        "api_id": 39182276,
-        "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338",
-        "session": (
-            "1BVtsOHIBuxmpWiBJ9hvwV9pSrzWw5U2I5Fe20Ww8l1LCk9rnsG6T6lLZEJXZE1JJC_qUH_yyWHnRoed"
-            "RNI5lJYnfjRN4gyGeDrCxquDU12ZflrpCz0VLhMZx2C0LlyUCy2eHRSRE1wUCpEYZaymL0P7Z9eAHwMy4"
-            "Oogewh5TqyO4x4MF6j0yTq8Zvfpv43O4aQDzErNv3GRqpx8DXBcOJIMP9yVhq-Mby5VH5J9cF-h-bJ5ws"
-            "3xKjA4GY7YKjHxDt9OI-Zr7mr-V3qZy99UxJooThJj51f2RqOKhODdLh9XZQ0ygSoAd3iFAZDOPMEo8Ch"
-            "5TrrzLXi2Q3N0HorIL1JfV0xoFQlY="
-        )
-    },
-    2: {
-        "name": "Acc 2 (gaylobucu)",
-        "api_id": 39182276,
-        "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338",
-        "session": (
-            "1BVtsOHIBuzoeRtBOmpNGh2sdyxpZ5e0nY4MrFe-6KKbmJPaM0YnCJiKRI0L9mEh1C5rwqLQqucj456LRF7v"
-            "V1YIPjZNqL6JevLM0Ww3FTml1NoKdwsiPINfsy9MbBlBhKOvha7py44L4pK5aEXjwpjpoNj4LaSmtWaPiQPuf"
-            "JuTwPB86f4gYjSeXM3HtxhnFU7MtHR5vbZPBa9N2HQSlt2BMB47q00DbQVtvYA37R3R-TrtV2MtwixL9ozChAD"
-            "Fq38NYcw4eRyRwKrkobVLccvz0_hvqgHXiQbrfcFLLRkRGwGlRCB-Ew4YhLLdnCbG1hjGEfxUrp9MRmF0JvS"
-            "-u20MfAuvlcgQ="
-        )
-    },
-    3: {
-        "name": "Acc 3 (phanhhyy)",
-        "api_id": 39182276,
-        "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338",
-        "session": (
-            "1BVtsOHIBuxrTG6Dt9a8C_J7D3bm1disV_mQiY_mw7AP5Gp-cEVAlKU1cfvOJiDnU6yi7PInfBRG_wJBQ3uNc-1k"
-            "Oa8fM3ITgUcE7YkaCd77FoBTgIFqw6gMYeRfVJOS1U9S_botQyX5764dx94NBfHHm8HuQKejs0PrdAJQq6WUT"
-            "DS3mkijWRWIvO4SwXSUrM5yNOFoGIrav8Mbuyl5ZFQaDPg_kwa11NT4kiqov8rVx0virTbGbQudyFeG80kP4zW2"
-            "CxcuL6TObemIPJgR_2-jb8zVQRQMiI4oN829ZCfHU2JCQY2S2clWwI7onZV8AhYP1LoDBiu32dgQPuk4brS-r"
-            "1DtkySc="
-        )
-    },
-    4: {
-        "name": "Acc 4 (Wind_trader)",
-        "api_id": 34333329,
-        "api_hash": "4f9371f95000578c84dbc670aaf1f819",
-        "session": (
-            "1BVtsOIIBuzNuH5Jfb4Uwek2dG7YRqSyFk-74KTokth0VB3_UTMwM8Edh_ikn83fJOGyN7JaWzIZXnro3ico"
-            "Y8zsjYIlT5nQ4z_GgKknABQ74FRseCvNbz3yyTkPOfQ4xJfZnJIJHuY4EkzVOzQzYZFg_EJWOj_vvg6OVwSk"
-            "Qv9Nd52tl_SlH4TofoxDXDNvxLJyFcoQFH6BegTybx-pFyX2tz0rMeR7AQujnGxqdWOd4zywoFVShzsCTFeq"
-            "dsBP9itJvg1YB0ISmJEYXzGEQo37IddAFGw3PJcAIY4BBctxri9_Cw-FbxhMgLU9gsotA3Rrys2jLcGV4CGf"
-            "Op_IzD0CmtNm845I="
-        )
-    }
+    1: {"name": "Acc 1 (hungzai22)", "api_id": 39182276, "api_hash": "", "session": ""},
+    2: {"name": "Acc 2 (gaylobucu)", "api_id": 39182276, "api_hash": "", "session": ""},
+    3: {"name": "Acc 3 (phanhhyy)", "api_id": 39182276, "api_hash": "", "session": ""},
+    4: {"name": "Acc 4 (Wind_trader)", "api_id": 34333329, "api_hash": "", "session": ""},
 }
 
 parser = argparse.ArgumentParser()
@@ -115,8 +71,12 @@ args, _ = parser.parse_known_args()
 ACC_INDEX = args.acc
 acc_data = ACCOUNTS_CONFIG.get(ACC_INDEX, ACCOUNTS_CONFIG[1])
 
-API_ID = acc_data["api_id"]
-API_HASH = acc_data["api_hash"]
+API_ID = int(os.getenv(f"TELEGRAM_API_ID_ACC{ACC_INDEX}") or acc_data["api_id"])
+API_HASH = (
+    os.getenv(f"TELEGRAM_API_HASH_ACC{ACC_INDEX}")
+    or os.getenv("TELEGRAM_API_HASH")
+    or acc_data["api_hash"]
+)
 STRING_SESSION = (
     os.getenv(f"TELEGRAM_STRING_SESSION_ACC{ACC_INDEX}")
     or os.getenv("TELEGRAM_STRING_SESSION")
@@ -892,6 +852,9 @@ def run():
             time.sleep(15)
 
 if __name__ == "__main__":
+    if not STRING_SESSION or not API_HASH:
+        log("FATAL", f"Acc {ACC_INDEX}: thieu session/api_hash. Can dat secret TELEGRAM_STRING_SESSION_ACC{ACC_INDEX} va TELEGRAM_API_HASH_ACC{ACC_INDEX}.", Fore.RED)
+        sys.exit(2)
     init_tok = get_fresh_init_data_sync()
     if init_tok and login_game():
         run()
