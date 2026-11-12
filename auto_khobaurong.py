@@ -218,7 +218,7 @@ def login_game():
         return None
 
 # -----------------------------------------------------------------
-#  NHIEM VU HANG NGAY (QUESTS)
+#  NHIEM VU HANG NGAY & HE THONG (FULL QUESTS SOLVER)
 # -----------------------------------------------------------------
 def handle_quests():
     try:
@@ -237,14 +237,34 @@ def handle_quests():
             title = q.get("title", q_id)
             claimed = q.get("claimed", False)
             if not claimed:
+                # 1. Thử gọi claim trực tiếp
                 claim_res = http_session.post(f"{BASE_URL}/api/quests/claim", json={
                     "telegramId": t_id,
                     "questId": q_id,
                     "initData": CURRENT_INIT_DATA
                 }, headers=get_game_headers(), timeout=15)
+                
                 if claim_res.status_code == 200:
                     c_data = claim_res.json()
                     log("QUEST", f"Nhan thuong nhiem vu [{title}]: +{fmt_num(c_data.get('rewardGold', 0))} Vang!", Fore.GREEN)
+                else:
+                    # 2. Nếu chưa cho claim, thử gọi complete/verify nếu nhiệm vụ dạng link/social
+                    complete_res = http_session.post(f"{BASE_URL}/api/quests/complete", json={
+                        "telegramId": t_id,
+                        "questId": q_id,
+                        "initData": CURRENT_INIT_DATA
+                    }, headers=get_game_headers(), timeout=15)
+                    if complete_res.status_code == 200:
+                        # Thử claim lại sau khi complete
+                        time.sleep(1)
+                        c2 = http_session.post(f"{BASE_URL}/api/quests/claim", json={
+                            "telegramId": t_id,
+                            "questId": q_id,
+                            "initData": CURRENT_INIT_DATA
+                        }, headers=get_game_headers(), timeout=15)
+                        if c2.status_code == 200:
+                            c_data = c2.json()
+                            log("QUEST", f"Hoan thanh & Nhan thuong [{title}]: +{fmt_num(c_data.get('rewardGold', 0))} Vang!", Fore.GREEN)
                 time.sleep(0.5)
     except Exception as e:
         log("ERR", f"Loi kiem tra nhiem vu: {e}", Fore.RED)
@@ -734,18 +754,9 @@ def handle_arena_and_dragons():
                         if p_r.status_code == 200:
                             log("ARENA", f"Xep Rong [{d_name}] vao O {slot_idx} thanh cong!", Fore.GREEN)
                     else:
-                        if curr_gold >= 14000:
-                            log("SHOP", f"Con o trong, dang mua Trung Dong (14.000 Vang) de ap Rong moi...", Fore.YELLOW)
-                            open_r = http_session.post(f"{BASE_URL}/api/packs/trung-dong/open", json={
-                                "telegramId": t_id,
-                                "username": u_name,
-                                "initData": CURRENT_INIT_DATA
-                            }, headers=get_game_headers(), timeout=15)
-                            if open_r.status_code == 200:
-                                curr_gold -= 14000
-                                log("SHOP", f"Ap Trung Dong thanh cong! Rong moi da san sang.", Fore.GREEN)
-                                time.sleep(1)
-                                break
+                        # DA TAT TU DONG MUA TRUNG DONG DE TIET KIEM TOAN BO VANG
+                        log("ARENA", f"O {slot_idx} dang trong nhung da tat che do mua Trung Dong de giu Vang.", Fore.WHITE)
+                        break
     except Exception as e:
         log("ERR", f"Loi xu ly dau truong: {e}", Fore.RED)
 
