@@ -131,7 +131,6 @@ def account_env(acc_id):
         session
         or os.getenv(f"TELEGRAM_STRING_SESSION_ACC{acc_id}", "")
         or os.getenv(f"TELEGRAM_SESSION_B64_ACC{acc_id}", "")
-        or os.getenv("TELEGRAM_STRING_SESSION", "")
     )
     api_hash = (
         api_hash
