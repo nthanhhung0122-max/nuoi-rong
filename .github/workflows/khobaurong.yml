@@ -39,6 +39,7 @@ jobs:
           WORKFLOW_FILE: "khobaurong.yml"
           GH_PAT: ${{ github.token }}
           TELEGRAM_ACCOUNTS_JSON: ${{ secrets.TELEGRAM_ACCOUNTS_JSON }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_STRING_SESSION_ACC1: ${{ secrets.TELEGRAM_STRING_SESSION_ACC1 }}
           TELEGRAM_API_HASH_ACC1: ${{ secrets.TELEGRAM_API_HASH_ACC1 }}
           TELEGRAM_STRING_SESSION_ACC2: ${{ secrets.TELEGRAM_STRING_SESSION_ACC2 }}
