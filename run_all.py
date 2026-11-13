@@ -36,20 +36,68 @@ MAX_RUNTIME = int(os.getenv("MAX_RUNTIME_SECONDS", "19800" if IS_GITHUB_ACTIONS 
 
 stop_flag = False
 
-def account_env(acc_id):
-    """Bơm session/api_hash từ secret TELEGRAM_ACCOUNTS_JSON xuống tiến trình con."""
-    raw = os.getenv("TELEGRAM_ACCOUNTS_JSON")
-    if not raw:
-        return {}
+def _account_from_json(raw, acc_id):
+    """Đọc một tài khoản từ các dạng JSON phổ biến mà không ghi log dữ liệu bí mật."""
     try:
-        accounts = json.loads(raw)["accounts"]
-        acc = accounts[acc_id - 1]
-    except (ValueError, KeyError, IndexError):
-        log("SUPERVISOR", f"TELEGRAM_ACCOUNTS_JSON không đọc được hoặc thiếu Acc {acc_id}.")
-        return {}
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"TELEGRAM_ACCOUNTS_JSON không phải JSON hợp lệ (vị trí {exc.pos}).") from None
+
+    if isinstance(data, list):
+        accounts = data
+    elif isinstance(data, dict) and isinstance(data.get("accounts"), list):
+        accounts = data["accounts"]
+    elif isinstance(data, dict):
+        accounts = data
+        for key in (str(acc_id), f"acc{acc_id}", f"ACC{acc_id}"):
+            if key in accounts:
+                item = accounts[key]
+                if not isinstance(item, dict):
+                    raise ValueError(f"Cấu hình Acc {acc_id} phải là object JSON.")
+                return item
+        raise ValueError("JSON phải chứa mảng 'accounts' hoặc object có khóa tài khoản (1, acc1...).")
+    else:
+        raise ValueError("JSON phải là mảng hoặc object.")
+
+    if acc_id < 1 or len(accounts) < acc_id:
+        raise ValueError(f"TELEGRAM_ACCOUNTS_JSON thiếu Acc {acc_id}.")
+    item = accounts[acc_id - 1]
+    if not isinstance(item, dict):
+        raise ValueError(f"Cấu hình Acc {acc_id} phải là object JSON.")
+    return item
+
+
+def account_env(acc_id):
+    """Lấy cấu hình Telegram cho tiến trình con; không bao giờ in session/API hash."""
+    raw = (os.getenv("TELEGRAM_ACCOUNTS_JSON") or "").strip()
+    session = ""
+    api_hash = ""
+
+    if raw:
+        item = _account_from_json(raw, acc_id)
+        session = (
+            item.get("session_str")
+            or item.get("string_session")
+            or item.get("session")
+            or ""
+        )
+        api_hash = item.get("api_hash") or ""
+
+    # Cho phép dùng GitHub Secrets riêng cho từng tài khoản.
+    session = session or os.getenv(f"TELEGRAM_STRING_SESSION_ACC{acc_id}", "")
+    api_hash = api_hash or os.getenv(f"TELEGRAM_API_HASH_ACC{acc_id}", "")
+
+    missing = []
+    if not str(session).strip():
+        missing.append(f"TELEGRAM_STRING_SESSION_ACC{acc_id} (hoặc session_str trong TELEGRAM_ACCOUNTS_JSON)")
+    if not str(api_hash).strip():
+        missing.append(f"TELEGRAM_API_HASH_ACC{acc_id} (hoặc api_hash trong TELEGRAM_ACCOUNTS_JSON)")
+    if missing:
+        raise ValueError(f"Thiếu cấu hình Acc {acc_id}: " + "; ".join(missing))
+
     return {
-        f"TELEGRAM_STRING_SESSION_ACC{acc_id}": acc.get("session_str") or "",
-        f"TELEGRAM_API_HASH_ACC{acc_id}": acc.get("api_hash") or "",
+        f"TELEGRAM_STRING_SESSION_ACC{acc_id}": str(session).strip(),
+        f"TELEGRAM_API_HASH_ACC{acc_id}": str(api_hash).strip(),
     }
 
 def log(tag, msg):
@@ -84,7 +132,7 @@ def trigger_next_shift():
     except Exception as e:
         log("CHAIN_ERR", f"Lỗi kích hoạt ca tiếp theo: {e}")
 
-def run_account_worker(acc_id, procs_dict):
+def run_account_worker(acc_id, procs_dict, account_configs):
     """Giám sát và tự động khởi động lại tiến trình của từng tài khoản nếu gặp lỗi"""
     while not stop_flag:
         cmd = [sys.executable, SCRIPT_NAME, "--acc", str(acc_id)]
@@ -95,7 +143,7 @@ def run_account_worker(acc_id, procs_dict):
             child_env["ACC_NUM"] = str(acc_id)
             child_env["PYTHONUNBUFFERED"] = "1"
             child_env["PYTHONIOENCODING"] = "utf-8"
-            child_env.update(account_env(acc_id))
+            child_env.update(account_configs[acc_id])
 
             p = subprocess.Popen(
                 cmd,
@@ -131,12 +179,22 @@ def main():
     log("SUPERVISOR", f"Thời gian tối đa: {MAX_RUNTIME} giây ({MAX_RUNTIME//3600}h {(MAX_RUNTIME%3600)//60}m)")
     log("SUPERVISOR", f"============================================================")
 
+    # Kiểm tra toàn bộ cấu hình trước khi tạo worker để tránh vòng lặp restart vô hạn.
+    account_configs = {}
+    try:
+        for acc in ACCOUNTS:
+            account_configs[acc] = account_env(acc)
+    except (ValueError, TypeError) as exc:
+        log("CONFIG_ERROR", str(exc))
+        log("CONFIG_ERROR", "Đã dừng trước khi khởi chạy tiến trình. Hãy kiểm tra GitHub Actions Secrets.")
+        return 2
+
     start_time = time.time()
     procs = {}
     threads = []
 
     for acc in ACCOUNTS:
-        t = threading.Thread(target=run_account_worker, args=(acc, procs), daemon=True)
+        t = threading.Thread(target=run_account_worker, args=(acc, procs, account_configs), daemon=True)
         t.start()
         threads.append(t)
         time.sleep(3)
@@ -174,4 +232,4 @@ def main():
     log("SUPERVISOR", "Đã hoàn thành toàn bộ công việc supervisor!")
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
