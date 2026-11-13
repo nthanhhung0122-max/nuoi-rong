@@ -37,7 +37,7 @@ jobs:
           PYTHONUNBUFFERED: "1"
           PYTHONIOENCODING: "utf-8"
           WORKFLOW_FILE: "khobaurong.yml"
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ github.token }}
           TELEGRAM_ACCOUNTS_JSON: ${{ secrets.TELEGRAM_ACCOUNTS_JSON }}
           TELEGRAM_STRING_SESSION_ACC1: ${{ secrets.TELEGRAM_STRING_SESSION_ACC1 }}
           TELEGRAM_API_HASH_ACC1: ${{ secrets.TELEGRAM_API_HASH_ACC1 }}
@@ -51,11 +51,3 @@ jobs:
         run: |
           python run_all.py
 
-      - name: Tu dong ban giao ca tiep theo (Handover Chaining 24/7)
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          echo "Kich hoat ca chay tiep theo..."
-          sleep 10
-          gh workflow run khobaurong.yml --repo "${{ github.repository }}" || echo "Handover triggered."
