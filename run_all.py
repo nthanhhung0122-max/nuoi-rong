@@ -37,34 +37,68 @@ MAX_RUNTIME = int(os.getenv("MAX_RUNTIME_SECONDS", "19800" if IS_GITHUB_ACTIONS 
 stop_flag = False
 
 def _account_from_json(raw, acc_id):
-    """Đọc một tài khoản từ các dạng JSON phổ biến mà không ghi log dữ liệu bí mật."""
+    """Chuẩn hóa nhiều định dạng JSON phổ biến; không ghi log dữ liệu bí mật."""
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise ValueError(f"TELEGRAM_ACCOUNTS_JSON không phải JSON hợp lệ (vị trí {exc.pos}).") from None
 
-    if isinstance(data, list):
-        accounts = data
-    elif isinstance(data, dict) and isinstance(data.get("accounts"), list):
-        accounts = data["accounts"]
-    elif isinstance(data, dict):
-        accounts = data
-        for key in (str(acc_id), f"acc{acc_id}", f"ACC{acc_id}"):
-            if key in accounts:
-                item = accounts[key]
-                if not isinstance(item, dict):
-                    raise ValueError(f"Cấu hình Acc {acc_id} phải là object JSON.")
-                return item
-        raise ValueError("JSON phải chứa mảng 'accounts' hoặc object có khóa tài khoản (1, acc1...).")
-    else:
-        raise ValueError("JSON phải là mảng hoặc object.")
+    def normalize(item):
+        # Một số cấu hình lưu trực tiếp StringSession thành chuỗi.
+        if isinstance(item, str):
+            return {"session": item}
+        if not isinstance(item, dict):
+            raise ValueError(f"Cấu hình Acc {acc_id} phải là object hoặc chuỗi session.")
 
-    if acc_id < 1 or len(accounts) < acc_id:
-        raise ValueError(f"TELEGRAM_ACCOUNTS_JSON thiếu Acc {acc_id}.")
-    item = accounts[acc_id - 1]
-    if not isinstance(item, dict):
-        raise ValueError(f"Cấu hình Acc {acc_id} phải là object JSON.")
-    return item
+        # Hỗ trợ object lồng trong telegram/config/account.
+        for nested_key in ("telegram", "config", "account", "credentials"):
+            nested = item.get(nested_key)
+            if isinstance(nested, dict):
+                merged = dict(item)
+                merged.update(nested)
+                item = merged
+                break
+        return item
+
+    if isinstance(data, list):
+        if acc_id < 1 or len(data) < acc_id:
+            raise ValueError(f"TELEGRAM_ACCOUNTS_JSON thiếu Acc {acc_id}.")
+        return normalize(data[acc_id - 1])
+
+    if not isinstance(data, dict):
+        raise ValueError("TELEGRAM_ACCOUNTS_JSON phải là object hoặc mảng.")
+
+    # Dạng {"accounts": [...]} hoặc {"accounts": {"1": ...}}
+    accounts = data.get("accounts")
+    if isinstance(accounts, list):
+        if acc_id < 1 or len(accounts) < acc_id:
+            raise ValueError(f"TELEGRAM_ACCOUNTS_JSON thiếu Acc {acc_id}.")
+        return normalize(accounts[acc_id - 1])
+    if isinstance(accounts, dict):
+        data = accounts
+
+    # Dạng {"1": {...}}, {"acc1": "session"}, {"ACC1": {...}}
+    keys = (
+        str(acc_id), f"acc{acc_id}", f"ACC{acc_id}",
+        f"account{acc_id}", f"Account{acc_id}",
+        f"account_{acc_id}", f"acc_{acc_id}"
+    )
+    for key in keys:
+        if key in data:
+            return normalize(data[key])
+
+    # Dạng object đơn của một tài khoản.
+    session_keys = (
+        "session_str", "string_session", "session", "sessionString",
+        "stringSession", "session_b64", "session_base64"
+    )
+    if any(k in data for k in session_keys):
+        return normalize(data)
+
+    raise ValueError(
+        "Không tìm thấy Acc trong TELEGRAM_ACCOUNTS_JSON. "
+        "Hỗ trợ khóa 1/acc1/account1, mảng accounts hoặc object tài khoản đơn."
+    )
 
 
 def account_env(acc_id):
@@ -79,17 +113,35 @@ def account_env(acc_id):
             item.get("session_str")
             or item.get("string_session")
             or item.get("session")
+            or item.get("sessionString")
+            or item.get("stringSession")
+            or item.get("session_b64")
+            or item.get("session_base64")
             or ""
         )
-        api_hash = item.get("api_hash") or ""
+        api_hash = (
+            item.get("api_hash")
+            or item.get("apiHash")
+            or item.get("hash")
+            or ""
+        )
 
-    # Cho phép dùng GitHub Secrets riêng cho từng tài khoản.
-    session = session or os.getenv(f"TELEGRAM_STRING_SESSION_ACC{acc_id}", "")
-    api_hash = api_hash or os.getenv(f"TELEGRAM_API_HASH_ACC{acc_id}", "")
+    # Secrets riêng từng tài khoản được ưu tiên; vẫn giữ fallback tên cũ.
+    session = (
+        session
+        or os.getenv(f"TELEGRAM_STRING_SESSION_ACC{acc_id}", "")
+        or os.getenv(f"TELEGRAM_SESSION_B64_ACC{acc_id}", "")
+        or os.getenv("TELEGRAM_STRING_SESSION", "")
+    )
+    api_hash = (
+        api_hash
+        or os.getenv(f"TELEGRAM_API_HASH_ACC{acc_id}", "")
+        or os.getenv("TELEGRAM_API_HASH", "")
+    )
 
     missing = []
     if not str(session).strip():
-        missing.append(f"TELEGRAM_STRING_SESSION_ACC{acc_id} (hoặc session_str trong TELEGRAM_ACCOUNTS_JSON)")
+        missing.append(f"TELEGRAM_STRING_SESSION_ACC{acc_id} (hoặc session trong TELEGRAM_ACCOUNTS_JSON)")
     if not str(api_hash).strip():
         missing.append(f"TELEGRAM_API_HASH_ACC{acc_id} (hoặc api_hash trong TELEGRAM_ACCOUNTS_JSON)")
     if missing:
