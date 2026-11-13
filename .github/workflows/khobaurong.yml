@@ -39,6 +39,14 @@ jobs:
           WORKFLOW_FILE: "khobaurong.yml"
           GH_PAT: ${{ secrets.GH_PAT }}
           TELEGRAM_ACCOUNTS_JSON: ${{ secrets.TELEGRAM_ACCOUNTS_JSON }}
+          TELEGRAM_STRING_SESSION_ACC1: ${{ secrets.TELEGRAM_STRING_SESSION_ACC1 }}
+          TELEGRAM_API_HASH_ACC1: ${{ secrets.TELEGRAM_API_HASH_ACC1 }}
+          TELEGRAM_STRING_SESSION_ACC2: ${{ secrets.TELEGRAM_STRING_SESSION_ACC2 }}
+          TELEGRAM_API_HASH_ACC2: ${{ secrets.TELEGRAM_API_HASH_ACC2 }}
+          TELEGRAM_STRING_SESSION_ACC3: ${{ secrets.TELEGRAM_STRING_SESSION_ACC3 }}
+          TELEGRAM_API_HASH_ACC3: ${{ secrets.TELEGRAM_API_HASH_ACC3 }}
+          TELEGRAM_STRING_SESSION_ACC4: ${{ secrets.TELEGRAM_STRING_SESSION_ACC4 }}
+          TELEGRAM_API_HASH_ACC4: ${{ secrets.TELEGRAM_API_HASH_ACC4 }}
           MAX_RUNTIME_SECONDS: "19800"
         run: |
           python run_all.py
