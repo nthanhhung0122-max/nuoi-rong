@@ -57,10 +57,10 @@ init(autoreset=True)
 #  DANH SACH TAI KHOAN HO TRO
 # -----------------------------------------------------------------
 ACCOUNTS_CONFIG = {
-    1: {"name": "Acc 1 (hungzai22)", "api_id": 39182276, "api_hash": "", "session": ""},
-    2: {"name": "Acc 2 (gaylobucu)", "api_id": 39182276, "api_hash": "", "session": ""},
-    3: {"name": "Acc 3 (phanhhyy)", "api_id": 39182276, "api_hash": "", "session": ""},
-    4: {"name": "Acc 4 (Wind_trader)", "api_id": 34333329, "api_hash": "", "session": ""},
+    1: {"name": "Acc 1 (hungzai22)", "api_id": 39182276, "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338", "session": ""},
+    2: {"name": "Acc 2 (gaylobucu)", "api_id": 39182276, "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338", "session": ""},
+    3: {"name": "Acc 3 (phanhhyy)", "api_id": 39182276, "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338", "session": ""},
+    4: {"name": "Acc 4 (Wind_trader)", "api_id": 34333329, "api_hash": "f02b155d895a3a3fbf8a1cbe810b5338", "session": ""},
 }
 
 parser = argparse.ArgumentParser()

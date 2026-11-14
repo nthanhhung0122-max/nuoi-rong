@@ -19,7 +19,7 @@ import requests
 from datetime import datetime
 
 # Cấu hình danh sách tài khoản
-DEFAULT_ACCOUNTS = [1, 2, 3, 4]
+DEFAULT_ACCOUNTS = [1, 2, 3]
 accounts_str = os.getenv("ACCOUNTS")
 if accounts_str:
     ACCOUNTS = [int(x.strip()) for x in accounts_str.split(",") if x.strip()]
@@ -131,11 +131,13 @@ def account_env(acc_id):
         session
         or os.getenv(f"TELEGRAM_STRING_SESSION_ACC{acc_id}", "")
         or os.getenv(f"TELEGRAM_SESSION_B64_ACC{acc_id}", "")
+        or os.getenv("TELEGRAM_STRING_SESSION", "")
     )
     api_hash = (
         api_hash
         or os.getenv(f"TELEGRAM_API_HASH_ACC{acc_id}", "")
         or os.getenv("TELEGRAM_API_HASH", "")
+        or "f02b155d895a3a3fbf8a1cbe810b5338"
     )
 
     missing = []
